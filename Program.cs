@@ -1,9 +1,13 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MinimalApi.Dominio.Interfaces;
+using MinimalApi.Dominio.Servicos;
 using MinimalApi.DTOs;
 using MinimalApi.Infraestrutura.Db;
 
 var builder = WebApplication.CreateBuilder(args);
-var app = builder.Build();
+
+builder.Services.AddScoped<IAdministradorServico, AdministradorServico>();
 
 builder.Services.AddDbContext<DbContexto>(options => {
     options.UseSqlServer(
@@ -11,10 +15,14 @@ builder.Services.AddDbContext<DbContexto>(options => {
     );
 });
 
-app.MapGet("/", () => "Hello World! Pepe");
+var app = builder.Build();
 
-app.MapPost("/login", (LoginDTO loginDTO) => {
-    if (loginDTO.Email == "adm@teste.com" && loginDTO.Senha == "123456"){
+app.MapGet("/", () => "Hello World! AAA");
+
+app.MapPost("/login", ([FromBody] LoginDTO loginDTO, IAdministradorServico administradorServico) => {
+    Console.WriteLine("LOgin");
+    if (administradorServico.Login(loginDTO) != null){
+        Console.WriteLine("Entrou no IOF");
         return Results.Ok("Login com sucesso");
     } else return Results.Unauthorized();
 });
