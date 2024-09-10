@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using minimal_api.Dominio.Enuns;
 using minimal_api.Dominio.Interfaces;
 using minimal_api.Dominio.Servicos;
 using MinimalApi.Dominio.Entidades;
@@ -31,17 +32,99 @@ app.MapGet("/", () => Results.Json(new Home())).WithTags("Home");
 # endregion
 
 # region Administradores
-app.MapPost("/login", ([FromBody] LoginDTO loginDTO, IAdministradorServico administradorServico) => {
-    Console.WriteLine("LOgin");
+app.MapPost("/administradores/login", ([FromBody] LoginDTO loginDTO, IAdministradorServico administradorServico) => {
     if (administradorServico.Login(loginDTO) != null){
         Console.WriteLine("Entrou no IOF");
         return Results.Ok("Login com sucesso");
     } else return Results.Unauthorized();
 }).WithTags("Administradores");
+
+app.MapGet("/administradores", ([FromQuery] int? pagina, IAdministradorServico administradorServico) => {
+    var adms = new List<AdministradorModelView>();
+    var administradores =  administradorServico.Todos(pagina);
+
+    foreach(var adm in administradores){
+        adms.Add(new AdministradorModelView{
+            Id = adm.Id,
+            Email = adm.Email,
+            Perfil = adm.Perfil
+        });
+    }
+    return Results.Ok(adms);
+}).WithTags("Administradores");
+
+app.MapGet("/administradores/{id}", ([FromQuery] int id,  IAdministradorServico administradorServico) => {
+    var adm = administradorServico.BuscaPorId(id);
+
+    if (adm == null ) return Results.NotFound();
+    return Results.Ok(new AdministradorModelView{
+        Id = adm.Id,
+        Email = adm.Email,
+        Perfil = adm.Perfil
+    });
+}).WithTags("Administradores");
+
+app.MapPost("/administradores", ([FromBody] AdministradorDTO administradorDTO, IAdministradorServico administradorServico) => {
+    var validacao = new ErrosDeValidacao{
+        Mensagens = new List<string>()
+    };
+
+    if (string.IsNullOrEmpty(administradorDTO.Email)){
+        validacao.Mensagens.Add("Email não pode ser vazio");
+    }
+    if (string.IsNullOrEmpty(administradorDTO.Senha)){
+        validacao.Mensagens.Add("Sehaa não pode ser vazia");
+    }
+    if (administradorDTO.Perfil == null){
+        validacao.Mensagens.Add("Perfil não po de ser vazio");
+    }
+
+    if (validacao.Mensagens.Count>0){
+        return Results.BadRequest(validacao);
+    }
+
+    var adm =  new Administrador{
+        Email = administradorDTO.Email,
+        Senha = administradorDTO.Senha,
+        Perfil = administradorDTO.Perfil.ToString() ?? Perfil.Editor.ToString(),
+    };
+
+    administradorServico.Incluir(adm);
+
+    return Results.Created($"/administrador/{adm.Id}", new AdministradorModelView{
+        Id = adm.Id,
+        Email = adm.Email,
+        Perfil = adm.Perfil
+    });
+
+}).WithTags("Administradores");
 # endregion
 
 # region Veiculos
+
+ErrosDeValidacao validaDTO(VeiculoDTO veiculoDTO){
+    var validacao = new ErrosDeValidacao{
+        Mensagens = new List<string>()
+    };
+
+    if (string.IsNullOrEmpty(veiculoDTO.Nome)){
+        validacao.Mensagens.Add("O nome não pode ser vazio");
+    }
+    if (string.IsNullOrEmpty(veiculoDTO.Marca)){
+        validacao.Mensagens.Add("A marca não pode ficar em branco");
+    }
+    if (veiculoDTO.Ano < 1950){
+        validacao.Mensagens.Add("Veiculo muito antigo, aceito somente anos superiores a 1950");
+    }
+    return validacao;
+}
+
 app.MapPost("/veiculos", ([FromBody] VeiculoDTO veiculoDTO, IVeiculoServico veiculoServico) => {
+    var validacao = validaDTO(veiculoDTO);
+    if (validacao.Mensagens.Count > 0){
+        return Results.BadRequest(validacao);
+    }
+
     var veiculo = new Veiculo{
         Nome = veiculoDTO.Nome,
         Marca = veiculoDTO.Marca,
@@ -67,9 +150,13 @@ app.MapGet("/veiculos/{id}", ([FromQuery] int id,  IVeiculoServico veiculoServic
 
 app.MapPut("/veiculos/{id}", ([FromRoute] int id, VeiculoDTO veiculoDTO, IVeiculoServico veiculoServico) => {
     var veiculo = veiculoServico.BuscaPorId(id);
-
     if (veiculo == null ) return Results.NotFound();
-    
+
+    var validacao = validaDTO(veiculoDTO);
+    if (validacao.Mensagens.Count > 0){
+        return Results.BadRequest(validacao);
+    }
+
     veiculo.Nome = veiculoDTO.Nome;
     veiculo.Marca = veiculoDTO.Marca;
     veiculo.Ano = veiculoDTO.Ano;

@@ -10,5 +10,8 @@ namespace MinimalApi.Dominio.Interfaces
     public interface IAdministradorServico
     {
         Administrador? Login(LoginDTO loginDTO);
+        Administrador Incluir(Administrador loginDTO);
+        List<Administrador> Todos(int? pagina);
+        Administrador? BuscaPorId(int id);
     }
 }
